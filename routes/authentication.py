@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, make_response
-from flask_login import login_required, login_user, logout_user, current_user  # Added current_user
+from flask_login import login_required, login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from models import db
@@ -7,8 +7,7 @@ from models.user import Users
 from validation.authentication import (
     validate_email, 
     validate_password, 
-    validate_first_name, 
-    validate_last_name
+    validate_username
 )
 
 authentication = Blueprint('authentication', __name__)
@@ -23,8 +22,7 @@ def perform_login(user, response_message):
             'user': {
                 'id': user.id,
                 'email': user.email,
-                'firstName': user.first_name,
-                'lastName': user.last_name
+                'username': user.username
             }
         }))
 
@@ -43,8 +41,7 @@ def register():
         VALIDATION_METHODS = {
             'email': validate_email,
             'password': validate_password,
-            'first_name': validate_first_name,
-            'last_name': validate_last_name
+            'username': validate_username
         }
 
         # Validate request data
@@ -57,14 +54,11 @@ def register():
         new_user = Users(
             password=generate_password_hash(data.get('password')),
             email=data.get('email'),
-            first_name=data.get('first_name'),
-            last_name=data.get('last_name'),
-            created_at=datetime.now(),
-            birthdate=data.get('birthdate'),
-            gender=data.get('gender'),
-            interested_in=data.get('interested_in'),
-            height_cm=data.get('height_cm'),
-            location=data.get('location')
+            username=data.get('username'),
+            phone_number=data.get('phone_number'),
+            bio=data.get('bio'),
+            location=data.get('location'),
+            created_at=datetime.now()
         )
 
         db.session.add(new_user)
@@ -91,7 +85,7 @@ def login():
             return jsonify({'message': 'Invalid credentials.'}), 401
 
         # Successful login
-        return perform_login(user, f'Welcome back {user.first_name}!')
+        return perform_login(user, f'Welcome back {user.username}!')
 
     except Exception as e:
         print(f'An exception occured: {e}')
@@ -118,17 +112,11 @@ def serialize_user(user):
     return {
         'id': user.id,
         'email': user.email,
+        'username': user.username,
         'phoneNumber': getattr(user, 'phone_number', None),
-        'firstName': user.first_name,
-        'lastName': user.last_name,
         'bio': getattr(user, 'bio', None),
-        'birthdate': str(user.birthdate) if user.birthdate else None,
-        'gender': user.gender,
-        'interestedIn': user.interested_in,
-        'heightCm': user.height_cm,
         'location': user.location,
-        'isActive': getattr(user, 'is_active', True),
-        'isVerified': getattr(user, 'is_verified', False)
+        'isActive': getattr(user, 'is_active', True)
     }
 
 @authentication.route('/validate-user', methods=['GET'])
@@ -155,8 +143,7 @@ def update_user():
         VALIDATION_METHODS = {
             'email': validate_email,
             'password': validate_password,
-            'first_name': validate_first_name,
-            'last_name': validate_last_name
+            'username': validate_username
         }
 
         # 2. Dynamic validation for updated fields
@@ -173,12 +160,19 @@ def update_user():
                 return jsonify({ 'message': 'Email is already taken.' }), 400
             user.email = data['email']
 
-        # 4. Handle Password Hashing if it's changing
+        # 4. Handle Username Uniqueness checking if it's changing
+        if 'username' in data and data['username'] != user.username:
+            existing_username = Users.query.filter_by(username=data['username']).first()
+            if existing_username:
+                return jsonify({ 'message': 'Username is already taken.' }), 400
+            user.username = data['username']
+
+        # 5. Handle Password Hashing if it's changing
         if 'password' in data:
             user.password = generate_password_hash(data['password'])
 
-        # 5. Map and update other optional profile fields safely
-        profile_fields = ['first_name', 'last_name', 'birthdate', 'gender', 'interested_in', 'height_cm', 'location']
+        # 6. Map and update other optional profile fields safely
+        profile_fields = ['phone_number', 'bio', 'location']
         for field in profile_fields:
             if field in data:
                 setattr(user, field, data[field])
@@ -190,8 +184,7 @@ def update_user():
             'user': {
                 'id': user.id,
                 'email': user.email,
-                'firstName': user.first_name,
-                'lastName': user.last_name
+                'username': user.username
             }
         }), 200
 

@@ -46,39 +46,24 @@ def validate_password(password):
 
 
 # -----------------------------
-# FIRST NAME
+# USERNAME
 # -----------------------------
-NAME_REGEX = r"^[a-zA-Z'-]{1,25}(?: [a-zA-Z'-]{1,25})*$"
+USERNAME_REGEX = r"^[a-zA-Z0-9_-]{3,25}$"
 
 
-def validate_first_name(first_name):
-    if not first_name:
-        return False, 'First name cannot be empty.'
+def validate_username(username):
+    if not username:
+        return False, 'Username cannot be empty.'
 
-    first_name = first_name.strip()
+    username = username.strip()
 
-    if len(first_name) > 25:
-        return False, 'First name cannot exceed 25 characters.'
+    if len(username) < 3 or len(username) > 25:
+        return False, 'Username must be between 3 and 25 characters.'
 
-    if not re.match(NAME_REGEX, first_name):
-        return False, 'Invalid first name format.'
+    if not re.match(USERNAME_REGEX, username):
+        return False, 'Username can only contain letters, numbers, underscores, and hyphens.'
 
-    return True, ''
-
-
-# -----------------------------
-# LAST NAME
-# -----------------------------
-def validate_last_name(last_name):
-    if last_name is None or last_name == '':
-        return True, ''  # last name optional
-
-    last_name = last_name.strip()
-
-    if len(last_name) > 25:
-        return False, 'Last name cannot exceed 25 characters.'
-
-    if not re.match(NAME_REGEX, last_name):
-        return False, 'Invalid last name format.'
+    if Users.query.filter_by(username=username).first():
+        return False, 'Username already taken.'
 
     return True, ''
