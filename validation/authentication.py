@@ -9,6 +9,9 @@ EMAIL_REGEX = r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
 
 
 def validate_email(email):
+    if not email or not isinstance(email, str):
+        return False, 'Email is required.'
+
     email = email.strip().lower()
 
     if len(email) < 3 or len(email) > 150:
@@ -27,20 +30,11 @@ def validate_email(email):
 # PASSWORD (STRONGER)
 # -----------------------------
 def validate_password(password):
-    if len(password) < 8 or len(password) > 128:
-        return False, 'Password must be between 8 and 128 characters.'
+    if not password or not isinstance(password, str):
+        return False, 'Password is required.'
 
-    if ' ' in password:
-        return False, 'Password cannot contain spaces.'
-
-    if not re.search(r'[A-Z]', password):
-        return False, 'Password must contain at least one uppercase letter.'
-
-    if not re.search(r'[a-z]', password):
-        return False, 'Password must contain at least one lowercase letter.'
-
-    if not re.search(r'\d', password):
-        return False, 'Password must contain at least one number.'
+    if len(password) < 5 or len(password) > 128:
+        return False, 'Password must be between 5 and 128 characters.'
 
     return True, ''
 
@@ -52,7 +46,7 @@ USERNAME_REGEX = r"^[a-zA-Z0-9_-]{3,25}$"
 
 
 def validate_username(username):
-    if not username:
+    if not username or not isinstance(username, str):
         return False, 'Username cannot be empty.'
 
     username = username.strip()

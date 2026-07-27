@@ -35,7 +35,10 @@ def perform_login(user, response_message):
 @authentication.route('/register', methods=['POST'])
 def register():
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        if not data:
+            return jsonify({'message': 'Request body must be valid JSON.'}), 400
 
         # Define validation methods
         VALIDATION_METHODS = {
@@ -147,11 +150,20 @@ def update_user():
         }
 
         # 2. Dynamic validation for updated fields
-        for key, method in VALIDATION_METHODS.items():
-            if key in data:
-                is_valid, message = method(data.get(key))
-                if not is_valid:
-                    return jsonify({ 'message': message }), 400
+        if 'email' in data and data['email'] != user.email:
+            is_valid, message = validate_email(data.get('email'))
+            if not is_valid:
+                return jsonify({ 'message': message }), 400
+
+        if 'username' in data and data['username'] != user.username:
+            is_valid, message = validate_username(data.get('username'))
+            if not is_valid:
+                return jsonify({ 'message': message }), 400
+
+        if 'password' in data:
+            is_valid, message = validate_password(data.get('password'))
+            if not is_valid:
+                return jsonify({ 'message': message }), 400
 
         # 3. Handle Email Uniqueness checking if it's changing
         if 'email' in data and data['email'] != user.email:
