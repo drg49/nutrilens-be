@@ -33,8 +33,11 @@ def validate_password(password):
     if not password or not isinstance(password, str):
         return False, 'Password is required.'
 
-    if len(password) < 5 or len(password) > 128:
-        return False, 'Password must be between 5 and 128 characters.'
+    if len(password) < 8:
+        return False, 'Password must be at least 8 characters long.'
+
+    if len(password) > 255:
+        return False, 'Password exceeds 255 character limit.'
 
     return True, ''
 
