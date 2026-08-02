@@ -6,29 +6,43 @@ from routes import routes
 from models import db
 import os
 
-app = Flask(__name__)
-
-# The load_dotenv() function will load the environmental variables from the .env file into the os.environ dictionary.
-# You can then access the environmental variables using os.environ.get('MY_VARIABLE').
+# Load environment variables before reading them
 load_dotenv()
 
-database_uri = os.environ.get('DATABASE_URI')
-jwt_secret = os.environ.get('JWT_SECRET')
+app = Flask(__name__)
+
+database_uri = os.environ.get("DATABASE_URI")
+secret_key = os.environ.get("JWT_SECRET")
+frontend_url = os.environ.get("FRONTEND_URL")  # https://your-app.vercel.app
+
+# Flask configuration
+app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
+app.config["SECRET_KEY"] = secret_key
+
+# Session cookie configuration
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = True          # HTTPS only
+app.config["SESSION_COOKIE_SAMESITE"] = "None"      # Required for cross-site cookies
+
+# If you use remember=True with Flask-Login
+app.config["REMEMBER_COOKIE_SECURE"] = True
+app.config["REMEMBER_COOKIE_SAMESITE"] = "None"
+
+# Initialize extensions
+db.init_app(app)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-# Configure database connection
-app.config['SQLALCHEMY_DATABASE_URI'] = database_uri
-app.config['SECRET_KEY'] = jwt_secret
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
-
-# Initialize the SQLAlchemy instance with the Flask app
-db.init_app(app)
-
-CORS(app, supports_credentials=True)
+# Allow only your frontend
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[frontend_url]
+)
 
 app.register_blueprint(routes)
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -36,10 +50,10 @@ def load_user(user_id):
     return Users.query.get(int(user_id))
 
 
-@app.get('/')
+@app.get("/")
 def index():
-    return 'The server is running.'
-    
-    
-if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=True)
+    return "The server is running."
+
+
+if __name__ == "__main__":
+    app.run(host="localhost", port=5000, debug=True)
