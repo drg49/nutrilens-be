@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_login import LoginManager
+from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 from routes import routes
 from models import db
@@ -12,42 +12,38 @@ load_dotenv()
 app = Flask(__name__)
 
 database_uri = os.environ.get("DATABASE_URI")
-secret_key = os.environ.get("JWT_SECRET")
-frontend_url = os.environ.get("FRONTEND_URL")  # https://your-app.vercel.app
+jwt_secret = os.environ.get("JWT_SECRET")
+frontend_url = os.environ.get("FRONTEND_URL")
 
 # Flask configuration
 app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
-app.config["SECRET_KEY"] = secret_key
 
-# Session cookie configuration
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SECURE"] = True          # HTTPS only
-app.config["SESSION_COOKIE_SAMESITE"] = "None"      # Required for cross-site cookies
+# JWT configuration
+app.config["JWT_SECRET_KEY"] = jwt_secret
 
-# If you use remember=True with Flask-Login
-app.config["REMEMBER_COOKIE_SECURE"] = True
-app.config["REMEMBER_COOKIE_SAMESITE"] = "None"
+# Access token expiration (example: 15 minutes)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 60 * 15
+
+# Refresh token expiration (example: 30 days)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = 60 * 60 * 24 * 30
+
 
 # Initialize extensions
 db.init_app(app)
 
-login_manager = LoginManager()
-login_manager.init_app(app)
+jwt = JWTManager(app)
 
-# Allow only your frontend
+
+# Allow frontend requests
 CORS(
     app,
-    supports_credentials=True,
-    origins=[frontend_url]
+    origins=[frontend_url],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"]
 )
 
+
 app.register_blueprint(routes)
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    from models.user import Users
-    return Users.query.get(int(user_id))
 
 
 @app.get("/")

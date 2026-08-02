@@ -1,5 +1,9 @@
 from flask import Blueprint, request, jsonify
-from flask_login import login_required, login_user, logout_user, current_user
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from models import db
@@ -14,12 +18,13 @@ authentication = Blueprint("authentication", __name__)
 
 
 def perform_login(user, response_message):
-    # Creates Flask-Login session (stored in the session cookie)
-    login_user(user, remember=True)
+    # Creates JWT token instead of Flask session cookie
+    access_token = create_access_token(identity=str(user.id))
 
     return (
         jsonify({
             "message": response_message,
+            "access_token": access_token,
             "user": {
                 "id": user.id,
                 "email": user.email,
@@ -47,6 +52,7 @@ def register():
         for key, method in validation_methods.items():
             value = data.get(key)
             is_valid, message = method(value)
+
             if not is_valid:
                 return jsonify({"message": message}), 400
 
@@ -63,7 +69,10 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        return perform_login(new_user, "Welcome to TableTop!")
+        return perform_login(
+            new_user,
+            "Welcome to TableTop!"
+        )
 
     except Exception as e:
         print(f"An exception occurred: {e}")
@@ -76,12 +85,20 @@ def login():
     try:
         data = request.get_json() or {}
 
-        user = Users.query.filter_by(email=data.get("email")).first()
+        user = Users.query.filter_by(
+            email=data.get("email")
+        ).first()
 
-        if not user or not check_password_hash(user.password, data.get("password")):
+        if not user or not check_password_hash(
+            user.password,
+            data.get("password")
+        ):
             return jsonify({"message": "Invalid credentials."}), 401
 
-        return perform_login(user, f"Welcome back {user.username}!")
+        return perform_login(
+            user,
+            f"Welcome back {user.username}!"
+        )
 
     except Exception as e:
         print(f"An exception occurred: {e}")
@@ -89,15 +106,24 @@ def login():
 
 
 @authentication.route("/logout", methods=["POST"])
-@login_required
+@jwt_required()
 def logout():
     try:
-        logout_user()
-        return jsonify({"message": "Logged out successfully."}), 200
+        # JWTs are stateless.
+        # Token removal happens on the frontend.
+        return jsonify({
+            "message": "Logged out successfully."
+        }), 200
 
     except Exception as e:
         print(f"An exception occurred: {e}")
         return jsonify({"message": "Failed to log out."}), 500
+
+
+def get_current_user():
+    user_id = get_jwt_identity()
+
+    return Users.query.get(int(user_id))
 
 
 def serialize_user(user):
@@ -113,71 +139,118 @@ def serialize_user(user):
 
 
 @authentication.route("/validate-user", methods=["GET"])
-@login_required
+@jwt_required()
 def validate_user():
     try:
+        user = get_current_user()
+
+        if not user:
+            return jsonify({
+                "message": "User not found."
+            }), 404
+
         return jsonify({
             "message": "User successfully validated.",
-            "user": serialize_user(current_user)
+            "user": serialize_user(user)
         }), 200
 
     except Exception as e:
         print(f"An exception occurred during validation: {e}")
-        return jsonify({"message": "Validation failed."}), 500
+        return jsonify({
+            "message": "Validation failed."
+        }), 500
 
 
 @authentication.route("/update-user", methods=["PUT"])
-@login_required
+@jwt_required()
 def update_user():
     try:
+        user = get_current_user()
+
+        if not user:
+            return jsonify({
+                "message": "User not found."
+            }), 404
+
         data = request.get_json() or {}
-        user = current_user
 
         if "email" in data and data["email"] != user.email:
-            is_valid, message = validate_email(data["email"])
-            if not is_valid:
-                return jsonify({"message": message}), 400
 
-            existing_email = Users.query.filter_by(email=data["email"]).first()
+            is_valid, message = validate_email(data["email"])
+
+            if not is_valid:
+                return jsonify({
+                    "message": message
+                }), 400
+
+            existing_email = Users.query.filter_by(
+                email=data["email"]
+            ).first()
+
             if existing_email:
-                return jsonify({"message": "Email is already taken."}), 400
+                return jsonify({
+                    "message": "Email is already taken."
+                }), 400
 
             user.email = data["email"]
 
-        if "username" in data and data["username"] != user.username:
-            is_valid, message = validate_username(data["username"])
-            if not is_valid:
-                return jsonify({"message": message}), 400
 
-            existing_username = Users.query.filter_by(username=data["username"]).first()
+        if "username" in data and data["username"] != user.username:
+
+            is_valid, message = validate_username(data["username"])
+
+            if not is_valid:
+                return jsonify({
+                    "message": message
+                }), 400
+
+            existing_username = Users.query.filter_by(
+                username=data["username"]
+            ).first()
+
             if existing_username:
-                return jsonify({"message": "Username is already taken."}), 400
+                return jsonify({
+                    "message": "Username is already taken."
+                }), 400
 
             user.username = data["username"]
 
+
         if "password" in data:
+
             is_valid, message = validate_password(data["password"])
+
             if not is_valid:
-                return jsonify({"message": message}), 400
+                return jsonify({
+                    "message": message
+                }), 400
 
-            user.password = generate_password_hash(data["password"])
+            user.password = generate_password_hash(
+                data["password"]
+            )
 
-        for field in ["phone_number", "bio", "location"]:
+
+        for field in [
+            "phone_number",
+            "bio",
+            "location"
+        ]:
             if field in data:
                 setattr(user, field, data[field])
+
 
         db.session.commit()
 
         return jsonify({
             "message": "Profile updated successfully.",
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "username": user.username
-            }
+            "user": serialize_user(user)
         }), 200
+
 
     except Exception as e:
         print(f"An exception occurred during profile update: {e}")
         db.session.rollback()
-        return jsonify({"message": "Failed to update user profile."}), 500
+
+        return jsonify({
+            "message": "Failed to update user profile."
+        }), 500
