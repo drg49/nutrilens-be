@@ -17,18 +17,21 @@ from validation.authentication import (
 authentication = Blueprint("authentication", __name__)
 
 
-def perform_login(user, response_message):
+def perform_login(user):
     # Creates JWT token instead of Flask session cookie
     access_token = create_access_token(identity=str(user.id))
 
     return (
         jsonify({
-            "message": response_message,
+            "message": "User logged in successfully.",
             "access_token": access_token,
             "user": {
                 "id": user.id,
                 "email": user.email,
-                "username": user.username
+                "username": user.username,
+                "phone_number": user.phone_number,
+                "bio": user.bio,
+                "location": user.location,
             }
         }),
         200
@@ -70,8 +73,7 @@ def register():
         db.session.commit()
 
         return perform_login(
-            new_user,
-            "Welcome to TableTop!"
+            new_user
         )
 
     except Exception as e:
@@ -96,8 +98,7 @@ def login():
             return jsonify({"message": "Invalid credentials."}), 401
 
         return perform_login(
-            user,
-            f"Welcome back {user.username}!"
+            user
         )
 
     except Exception as e:
